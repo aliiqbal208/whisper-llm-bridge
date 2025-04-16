@@ -1,0 +1,52 @@
+version: '3'
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    environment:
+      - ASR_MODEL=medium
+      - ASR_ENGINE=openai_whisper
+      - ENABLE_CPU_OPTIMIZATION=true
+    ports:
+      - "9000:9000"
+    volumes:
+      - whisper_data:/app/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  
+  bridge:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ollama
+      - whisper
+    restart: unless-stopped
+    environment:
+      - WHISPER_URL=http://whisper:9000
+      - OLLAMA_URL=http://ollama:11434
+      - MAX_CONCURRENT_REQUESTS=50
+
+volumes:
+  ollama_data:
+  whisper_data:
